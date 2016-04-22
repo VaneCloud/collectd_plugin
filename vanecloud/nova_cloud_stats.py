@@ -20,6 +20,7 @@ from maas_common import get_auth_ref
 from maas_common import get_keystone_client
 from maas_common import get_nova_client
 from maas_common import metric
+from maas_common import metric_bool
 from maas_common import status_err
 from maas_common import status_ok
 
@@ -87,40 +88,46 @@ def configure_callback(conf):
 
 
 def check():
-    keystone = get_keystone_client(CONFIGS['auth_ref'])
-    tenant_id = keystone.tenant_id
-
-    COMPUTE_ENDPOINT = (
-        'http://{ip}:8774/v2/{tenant_id}'.format(ip=CONFIGS['ip'],
-                                                 tenant_id=tenant_id)
-    )
-
     try:
-        if CONFIGS['ip']:
-            nova = get_nova_client(bypass_url=COMPUTE_ENDPOINT)
+        keystone = get_keystone_client(CONFIGS['auth_ref'])
+        tenant_id = keystone.tenant_id
+
+        COMPUTE_ENDPOINT = (
+            'http://{ip}:8774/v2/{tenant_id}'.format(ip=CONFIGS['ip'],
+                                                     tenant_id=tenant_id)
+        )
+
+        try:
+            if CONFIGS['ip']:
+                nova = get_nova_client(bypass_url=COMPUTE_ENDPOINT)
+            else:
+                nova = get_nova_client()
+
+        except Exception as e:
+            status_err(str(e))
         else:
-            nova = get_nova_client()
+            # get some cloud stats
+            stats = nova.hypervisor_stats.statistics()
+            cloud_stats = collections.defaultdict(dict)
+            for metric_name, vals in stats_mapping.iteritems():
+                cloud_stats[metric_name]['value'] = \
+                    getattr(stats, vals['stat_name'])
+                cloud_stats[metric_name]['unit'] = \
+                    vals['unit']
+                cloud_stats[metric_name]['type'] = \
+                    vals['type']
 
-    except Exception as e:
-        status_err(str(e))
-    else:
-        # get some cloud stats
-        stats = nova.hypervisor_stats.statistics()
-        cloud_stats = collections.defaultdict(dict)
-        for metric_name, vals in stats_mapping.iteritems():
-            cloud_stats[metric_name]['value'] = \
-                getattr(stats, vals['stat_name'])
-            cloud_stats[metric_name]['unit'] = \
-                vals['unit']
-            cloud_stats[metric_name]['type'] = \
-                vals['type']
+        status_ok()
+        for metric_name in cloud_stats.iterkeys():
+            metric(PLUGIN,
+                   'cloud_resource_%s' % metric_name,
+                   cloud_stats[metric_name]['value'],
+                   interval=CONFIGS['interval'])
+    except:
+        metric_bool(PLUGIN, 'nova_cloud_stats', False,
+                    interval=CONFIGS['interval'])
+        raise
 
-    status_ok()
-    for metric_name in cloud_stats.iterkeys():
-        metric(PLUGIN,
-               'cloud_resource_%s' % metric_name,
-               cloud_stats[metric_name]['value'],
-               interval=CONFIGS['interval'])
 
 # register callbacks
 collectd.register_config(configure_callback)

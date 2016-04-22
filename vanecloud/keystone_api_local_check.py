@@ -54,48 +54,53 @@ def configure_callback(conf):
 
 
 def check():
-    auth_details = CONFIGS['auth_details']
-    if auth_details['OS_AUTH_VERSION'] == '2':
-        IDENTITY_ENDPOINT = 'http://{ip}:35357/v2.0'.format(ip=CONFIGS['ip'])
-    else:
-        IDENTITY_ENDPOINT = 'http://{ip}:35357/v3'.format(ip=CONFIGS['ip'])
-
     try:
-        if CONFIGS['ip']:
-            keystone = get_keystone_client(endpoint=IDENTITY_ENDPOINT)
-        else:
-            keystone = get_keystone_client()
-
-        is_up = True
-    except (exc.HttpServerError, exc.ClientException):
-        is_up = False
-    # Any other exception presumably isn't an API error
-    except Exception as e:
-        status_err(str(e))
-    else:
-        # time something arbitrary
-        start = time.time()
-        keystone.services.list()
-        end = time.time()
-        milliseconds = (end - start) * 1000
-
-        # gather some vaguely interesting metrics to return
+        auth_details = CONFIGS['auth_details']
         if auth_details['OS_AUTH_VERSION'] == '2':
-            project_count = len(keystone.tenants.list())
-            user_count = len(keystone.users.list())
+            IDENTITY_ENDPOINT = 'http://{ip}:35357/v2.0'\
+                                .format(ip=CONFIGS['ip'])
         else:
-            project_count = len(keystone.projects.list())
-            user_count = len(keystone.users.list(domain='Default'))
+            IDENTITY_ENDPOINT = 'http://{ip}:35357/v3'.format(ip=CONFIGS['ip'])
 
-    status_ok()
-    metric_bool(PLUGIN, 'keystone_api_local_status', is_up)
-    # only want to send other metrics if api is up
-    if is_up:
-        metric(PLUGIN,
-               'keystone_api_local_response_time',
-               '%.3f' % milliseconds,)
-        metric(PLUGIN, 'keystone_user_count', user_count,)
-        metric(PLUGIN, 'keystone_tenant_count', project_count,)
+        try:
+            if CONFIGS['ip']:
+                keystone = get_keystone_client(endpoint=IDENTITY_ENDPOINT)
+            else:
+                keystone = get_keystone_client()
+
+            is_up = True
+        except (exc.HttpServerError, exc.ClientException):
+            is_up = False
+        # Any other exception presumably isn't an API error
+        except Exception as e:
+            status_err(str(e))
+        else:
+            # time something arbitrary
+            start = time.time()
+            keystone.services.list()
+            end = time.time()
+            milliseconds = (end - start) * 1000
+
+            # gather some vaguely interesting metrics to return
+            if auth_details['OS_AUTH_VERSION'] == '2':
+                project_count = len(keystone.tenants.list())
+                user_count = len(keystone.users.list())
+            else:
+                project_count = len(keystone.projects.list())
+                user_count = len(keystone.users.list(domain='Default'))
+
+        status_ok()
+        metric_bool(PLUGIN, 'keystone_api_local_status', is_up)
+        # only want to send other metrics if api is up
+        if is_up:
+            metric(PLUGIN,
+                   'keystone_api_local_response_time',
+                   '%.3f' % milliseconds,)
+            metric(PLUGIN, 'keystone_user_count', user_count,)
+            metric(PLUGIN, 'keystone_tenant_count', project_count,)
+    except:
+        metric_bool(PLUGIN, 'keystone_api_local_status', False)
+        raise
 
 
 # register callbacks

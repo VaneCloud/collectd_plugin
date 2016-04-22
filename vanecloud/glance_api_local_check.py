@@ -56,44 +56,48 @@ def configure_callback(conf):
 
 
 def check():
-    GLANCE_ENDPOINT = (
-        'http://{ip}:9292/v1'.format(ip=CONFIGS['ip'])
-    )
-
     try:
-        if CONFIGS['ip']:
-            glance = get_glance_client(endpoint=GLANCE_ENDPOINT)
+        GLANCE_ENDPOINT = (
+            'http://{ip}:9292/v1'.format(ip=CONFIGS['ip'])
+        )
+
+        try:
+            if CONFIGS['ip']:
+                glance = get_glance_client(endpoint=GLANCE_ENDPOINT)
+            else:
+                glance = get_glance_client()
+
+            is_up = True
+        except exc.HTTPException:
+            is_up = False
+        # Any other exception presumably isn't an API error
+        except Exception as e:
+            status_err(str(e))
         else:
-            glance = get_glance_client()
+            # time something arbitrary
+            start = time.time()
+            glance.images.list(search_opts={'all_tenants': 1})
+            end = time.time()
+            milliseconds = (end - start) * 1000
+            # gather some metrics
+            images = glance.images.list(search_opts={'all_tenants': 1})
+            status_count = collections.Counter([s.status for s in images])
 
-        is_up = True
-    except exc.HTTPException:
-        is_up = False
-    # Any other exception presumably isn't an API error
-    except Exception as e:
-        status_err(str(e))
-    else:
-        # time something arbitrary
-        start = time.time()
-        glance.images.list(search_opts={'all_tenants': 1})
-        end = time.time()
-        milliseconds = (end - start) * 1000
-        # gather some metrics
-        images = glance.images.list(search_opts={'all_tenants': 1})
-        status_count = collections.Counter([s.status for s in images])
+        status_ok()
+        metric_bool(PLUGIN, 'glance_api_local_status', is_up)
 
-    status_ok()
-    metric_bool(PLUGIN, 'glance_api_local_status', is_up)
-
-    # only want to send other metrics if api is up
-    if is_up:
-        metric(PLUGIN,
-               'glance_api_local_response_time',
-               '%.3f' % milliseconds,)
-        for status in IMAGE_STATUSES:
+        # only want to send other metrics if api is up
+        if is_up:
             metric(PLUGIN,
-                   'glance_%s_images' % status,
-                   status_count[status],)
+                   'glance_api_local_response_time',
+                   '%.3f' % milliseconds,)
+            for status in IMAGE_STATUSES:
+                metric(PLUGIN,
+                       'glance_%s_images' % status,
+                       status_count[status],)
+    except:
+        metric_bool(PLUGIN, 'glance_api_local_status', False)
+        raise
 
 
 # register callbacks

@@ -62,60 +62,64 @@ def configure_callback(conf):
 
 
 def check():
-    keystone = get_keystone_client(CONFIGS['auth_ref'])
-    auth_token = keystone.auth_token
-
-    VOLUME_ENDPOINT = ('http://{ip}:8776/v1/{tenant}'.format
-                       (ip=CONFIGS['ip'], tenant=keystone.tenant_id))
-
-    s = requests.Session()
-
-    s.headers.update(
-        {'Content-type': 'application/json',
-         'x-auth-token': auth_token})
-
     try:
-        vol = s.get('%s/volumes/detail' % VOLUME_ENDPOINT,
-                    verify=False,
-                    timeout=10)
-        milliseconds = vol.elapsed.total_seconds() * 1000
-        snap = s.get('%s/snapshots/detail' % VOLUME_ENDPOINT,
-                     verify=False,
-                     timeout=10)
-        is_up = vol.ok and snap.ok
-    except (exc.ConnectionError,
-            exc.HTTPError,
-            exc.Timeout) as e:
-        is_up = False
-    except Exception as e:
-        status_err(str(e))
-    else:
-        # gather some metrics
-        vol_statuses = [v['status'] for v in vol.json()['volumes']]
-        vol_status_count = collections.Counter(vol_statuses)
-        total_vols = len(vol.json()['volumes'])
+        keystone = get_keystone_client(CONFIGS['auth_ref'])
+        auth_token = keystone.auth_token
 
-        snap_statuses = [v['status'] for v in snap.json()['snapshots']]
-        snap_status_count = collections.Counter(snap_statuses)
-        total_snaps = len(snap.json()['snapshots'])
+        VOLUME_ENDPOINT = ('http://{ip}:8776/v1/{tenant}'.format
+                           (ip=CONFIGS['ip'], tenant=keystone.tenant_id))
 
-    status_ok()
-    metric_bool(PLUGIN, 'cinder_api_local_status', is_up)
-    # only want to send other metrics if api is up
-    if is_up:
-        metric(PLUGIN,
-               'cinder_api_local_response_time',
-               '%.3f' % milliseconds,)
-        metric(PLUGIN, 'total_cinder_volumes', total_vols)
-        for status in VOLUME_STATUSES:
+        s = requests.Session()
+
+        s.headers.update(
+            {'Content-type': 'application/json',
+             'x-auth-token': auth_token})
+
+        try:
+            vol = s.get('%s/volumes/detail' % VOLUME_ENDPOINT,
+                        verify=False,
+                        timeout=10)
+            milliseconds = vol.elapsed.total_seconds() * 1000
+            snap = s.get('%s/snapshots/detail' % VOLUME_ENDPOINT,
+                         verify=False,
+                         timeout=10)
+            is_up = vol.ok and snap.ok
+        except (exc.ConnectionError,
+                exc.HTTPError,
+                exc.Timeout) as e:
+            is_up = False
+        except Exception as e:
+            status_err(str(e))
+        else:
+            # gather some metrics
+            vol_statuses = [v['status'] for v in vol.json()['volumes']]
+            vol_status_count = collections.Counter(vol_statuses)
+            total_vols = len(vol.json()['volumes'])
+
+            snap_statuses = [v['status'] for v in snap.json()['snapshots']]
+            snap_status_count = collections.Counter(snap_statuses)
+            total_snaps = len(snap.json()['snapshots'])
+
+        status_ok()
+        metric_bool(PLUGIN, 'cinder_api_local_status', is_up)
+        # only want to send other metrics if api is up
+        if is_up:
             metric(PLUGIN,
-                   'cinder_%s_volumes' % status,
-                   vol_status_count[status])
-        metric(PLUGIN, 'total_cinder_snapshots', total_snaps)
-        for status in VOLUME_STATUSES:
-            metric(PLUGIN,
-                   'cinder_%s_snaps' % status,
-                   snap_status_count[status])
+                   'cinder_api_local_response_time',
+                   '%.3f' % milliseconds,)
+            metric(PLUGIN, 'total_cinder_volumes', total_vols)
+            for status in VOLUME_STATUSES:
+                metric(PLUGIN,
+                       'cinder_%s_volumes' % status,
+                       vol_status_count[status])
+            metric(PLUGIN, 'total_cinder_snapshots', total_snaps)
+            for status in VOLUME_STATUSES:
+                metric(PLUGIN,
+                       'cinder_%s_snaps' % status,
+                       snap_status_count[status])
+    except:
+        metric_bool(PLUGIN, 'cinder_api_local_status', False)
+        raise
 
 # register callbacks
 collectd.register_config(configure_callback)

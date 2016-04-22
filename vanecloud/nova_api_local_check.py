@@ -57,50 +57,55 @@ def configure_callback(conf):
 
 
 def check():
-    keystone = get_keystone_client(CONFIGS['auth_ref'])
-    tenant_id = keystone.tenant_id
-
-    COMPUTE_ENDPOINT = (
-        'http://{ip}:8774/v2/{tenant_id}'.format(ip=CONFIGS['ip'],
-                                                 tenant_id=tenant_id)
-    )
-
     try:
-        if CONFIGS['ip']:
-            nova = get_nova_client(bypass_url=COMPUTE_ENDPOINT)
+        keystone = get_keystone_client(CONFIGS['auth_ref'])
+        tenant_id = keystone.tenant_id
+
+        COMPUTE_ENDPOINT = (
+            'http://{ip}:8774/v2/{tenant_id}'.format(ip=CONFIGS['ip'],
+                                                     tenant_id=tenant_id)
+        )
+
+        try:
+            if CONFIGS['ip']:
+                nova = get_nova_client(bypass_url=COMPUTE_ENDPOINT)
+            else:
+                nova = get_nova_client()
+
+            is_up = True
+        except exc.ClientException:
+            is_up = False
+        # Any other exception presumably isn't an API error
+        except Exception as e:
+            status_err(str(e))
         else:
-            nova = get_nova_client()
+            # time something arbitrary
+            start = time.time()
+            nova.services.list()
+            end = time.time()
+            milliseconds = (end - start) * 1000
 
-        is_up = True
-    except exc.ClientException:
-        is_up = False
-    # Any other exception presumably isn't an API error
-    except Exception as e:
-        status_err(str(e))
-    else:
-        # time something arbitrary
-        start = time.time()
-        nova.services.list()
-        end = time.time()
-        milliseconds = (end - start) * 1000
+            servers = nova.servers.list(search_opts={'all_tenants': 1})
+            # gather some metrics
+            status_count = collections.Counter([s.status for s in servers])
 
-        servers = nova.servers.list(search_opts={'all_tenants': 1})
-        # gather some metrics
-        status_count = collections.Counter([s.status for s in servers])
-
-    status_ok()
-    metric_bool(PLUGIN, 'nova_api_local_status', is_up, 
-                interval=CONFIGS['interval'])
-    # only want to send other metrics if api is up
-    if is_up:
-        metric(PLUGIN,
-               'nova_api_local_response_time',
-               '%.3f' % milliseconds,
-               interval=CONFIGS['interval'])
-        for status in SERVER_STATUSES:
-            metric(PLUGIN, 'nova_instances_in_state_%s' % status,
-                   status_count[status],
+        status_ok()
+        metric_bool(PLUGIN, 'nova_api_local_status', is_up,
+                    interval=CONFIGS['interval'])
+        # only want to send other metrics if api is up
+        if is_up:
+            metric(PLUGIN,
+                   'nova_api_local_response_time',
+                   '%.3f' % milliseconds,
                    interval=CONFIGS['interval'])
+            for status in SERVER_STATUSES:
+                metric(PLUGIN, 'nova_instances_in_state_%s' % status,
+                       status_count[status],
+                       interval=CONFIGS['interval'])
+    except:
+        metric_bool(PLUGIN, 'nova_api_local_status', False,
+                    interval=CONFIGS['interval'])
+        raise
 
 
 # register callbacks

@@ -52,47 +52,50 @@ def configure_callback(conf):
 
 
 def check():
-
-    NETWORK_ENDPOINT = 'http://{ip}:9696'.format(ip=CONFIGS['ip'])
-
     try:
-        if CONFIGS['ip']:
-            neutron = get_neutron_client(endpoint_url=NETWORK_ENDPOINT)
+        NETWORK_ENDPOINT = 'http://{ip}:9696'.format(ip=CONFIGS['ip'])
+
+        try:
+            if CONFIGS['ip']:
+                neutron = get_neutron_client(endpoint_url=NETWORK_ENDPOINT)
+            else:
+                neutron = get_neutron_client()
+
+            is_up = True
+        # if we get a NeutronClientException don't bother sending
+        # any other metric The API IS DOWN
+        except exc.NeutronClientException:
+            is_up = False
+        # Any other exception presumably isn't an API error
+        except Exception as e:
+            status_err(str(e))
         else:
-            neutron = get_neutron_client()
+            # time something arbitrary
+            start = time.time()
+            neutron.list_agents()
+            end = time.time()
+            milliseconds = (end - start) * 1000
 
-        is_up = True
-    # if we get a NeutronClientException don't bother sending any other metric
-    # The API IS DOWN
-    except exc.NeutronClientException:
-        is_up = False
-    # Any other exception presumably isn't an API error
-    except Exception as e:
-        status_err(str(e))
-    else:
-        # time something arbitrary
-        start = time.time()
-        neutron.list_agents()
-        end = time.time()
-        milliseconds = (end - start) * 1000
+            # gather some metrics
+            networks = len(neutron.list_networks()['networks'])
+            agents = len(neutron.list_agents()['agents'])
+            routers = len(neutron.list_routers()['routers'])
+            subnets = len(neutron.list_subnets()['subnets'])
 
-        # gather some metrics
-        networks = len(neutron.list_networks()['networks'])
-        agents = len(neutron.list_agents()['agents'])
-        routers = len(neutron.list_routers()['routers'])
-        subnets = len(neutron.list_subnets()['subnets'])
-
-    status_ok()
-    metric_bool(PLUGIN, 'neutron_api_local_status', is_up)
-    # only want to send other metrics if api is up
-    if is_up:
-        metric(PLUGIN,
-               'neutron_api_local_response_time',
-               '%.3f' % milliseconds,)
-        metric(PLUGIN, 'neutron_networks', networks)
-        metric(PLUGIN, 'neutron_agents', agents)
-        metric(PLUGIN, 'neutron_routers', routers)
-        metric(PLUGIN, 'neutron_subnets', subnets)
+        status_ok()
+        metric_bool(PLUGIN, 'neutron_api_local_status', is_up)
+        # only want to send other metrics if api is up
+        if is_up:
+            metric(PLUGIN,
+                   'neutron_api_local_response_time',
+                   '%.3f' % milliseconds,)
+            metric(PLUGIN, 'neutron_networks', networks)
+            metric(PLUGIN, 'neutron_agents', agents)
+            metric(PLUGIN, 'neutron_routers', routers)
+            metric(PLUGIN, 'neutron_subnets', subnets)
+    except:
+        metric_bool(PLUGIN, 'neutron_api_local_status', False)
+        raise
 
 
 # register callbacks
