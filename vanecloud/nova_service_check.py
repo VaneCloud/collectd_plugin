@@ -55,45 +55,50 @@ def configure_callback(conf):
 
 
 def check():
-    keystone = get_keystone_client(CONFIGS['auth_ref'])
-    auth_token = keystone.auth_token
-    tenant_id = keystone.tenant_id
-
-    COMPUTE_ENDPOINT = (
-        'http://{hostname}:8774/v2/{tenant_id}'.format(hostname=CONFIGS['ip'],
-                                                       tenant_id=tenant_id)
-    )
     try:
-        nova = get_nova_client(auth_token=auth_token,
-                               bypass_url=COMPUTE_ENDPOINT)
+        keystone = get_keystone_client(CONFIGS['auth_ref'])
+        auth_token = keystone.auth_token
+        tenant_id = keystone.tenant_id
 
-    # not gathering api status metric here so catch any exception
-    except Exception as e:
-        status_err(str(e))
+        COMPUTE_ENDPOINT = (
+            'http://{hostname}:8774/v2/{tenant_id}'
+            .format(hostname=CONFIGS['ip'], tenant_id=tenant_id)
+        )
+        try:
+            nova = get_nova_client(auth_token=auth_token,
+                                   bypass_url=COMPUTE_ENDPOINT)
 
-    # gather nova service states
-    if CONFIGS['host']:
-        services = nova.services.list(host=CONFIGS['host'])
-    else:
-        services = nova.services.list()
+        # not gathering api status metric here so catch any exception
+        except Exception as e:
+            status_err(str(e))
 
-    if len(services) == 0:
-        status_err("No host(s) found in the service list")
-
-    # return all the things
-    status_ok()
-    for service in services:
-        service_is_up = True
-
-        if service.status == 'enabled' and service.state == 'down':
-            service_is_up = False
-
+        # gather nova service states
         if CONFIGS['host']:
-            name = '%s_status' % service.binary
+            services = nova.services.list(host=CONFIGS['host'])
         else:
-            name = '%s_on_host_%s_status' % (service.binary, service.host)
+            services = nova.services.list()
 
-        metric_bool(PLUGIN, name, service_is_up)
+        if len(services) == 0:
+            status_err("No host(s) found in the service list")
+
+        # return all the things
+        status_ok()
+        for service in services:
+            service_is_up = True
+
+            if service.status == 'enabled' and service.state == 'down':
+                service_is_up = False
+
+            if CONFIGS['host']:
+                name = '%s_status' % service.binary
+            else:
+                name = '%s_on_host_%s_status' % (service.binary, service.host)
+
+            metric_bool(PLUGIN, name, service_is_up)
+        metric_bool(PLUGIN, 'nova_service_check_status', True)
+    except:
+        metric_bool(PLUGIN, 'nova_service_check_status', False)
+        raise
 
 
 # register callbacks

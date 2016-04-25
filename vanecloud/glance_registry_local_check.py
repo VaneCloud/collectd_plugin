@@ -53,34 +53,40 @@ def configure_callback(conf):
 
 
 def check():
-    # We call get_keystone_client here as there is some logic within to get a
-    # new token if previous one is bad.
-    keystone = get_keystone_client(CONFIGS['auth_ref'])
-    auth_token = keystone.auth_token
-    registry_endpoint = 'http://{ip}:9191'.format(ip=CONFIGS['ip'])
-
-    s = requests.Session()
-
-    s.headers.update(
-        {'Content-type': 'application/json',
-         'x-auth-token': auth_token})
-
     try:
-        # /images returns a list of public, non-deleted images
-        r = s.get('%s/images' % registry_endpoint, verify=False, timeout=10)
-        is_up = r.ok
-    except (exc.ConnectionError, exc.HTTPError, exc.Timeout):
-        is_up = False
-    except Exception as e:
-        status_err(str(e))
+        # We call get_keystone_client here as there is some logic
+        # within to get a new token if previous one is bad.
+        keystone = get_keystone_client(CONFIGS['auth_ref'])
+        auth_token = keystone.auth_token
+        registry_endpoint = 'http://{ip}:9191'.format(ip=CONFIGS['ip'])
 
-    status_ok()
-    metric_bool(PLUGIN, 'glance_registry_local_status', is_up)
-    # only want to send other metrics if api is up
-    if is_up:
-        milliseconds = r.elapsed.total_seconds() * 1000
-        metric(PLUGIN, 'glance_registry_local_response_time',
-               '%.3f' % milliseconds)
+        s = requests.Session()
+
+        s.headers.update(
+            {'Content-type': 'application/json',
+             'x-auth-token': auth_token})
+
+        try:
+            # /images returns a list of public, non-deleted images
+            r = s.get('%s/images' % registry_endpoint, verify=False,
+                      timeout=10)
+            is_up = r.ok
+        except (exc.ConnectionError, exc.HTTPError, exc.Timeout):
+            is_up = False
+        except Exception as e:
+            status_err(str(e))
+
+        status_ok()
+        metric_bool(PLUGIN, 'glance_registry_local_status', is_up)
+        # only want to send other metrics if api is up
+        if is_up:
+            milliseconds = r.elapsed.total_seconds() * 1000
+            metric(PLUGIN, 'glance_registry_local_response_time',
+                   '%.3f' % milliseconds)
+    except:
+        metric_bool(PLUGIN, 'glance_registry_local_status', False)
+        raise
+
 
 # register callbacks
 collectd.register_config(configure_callback)

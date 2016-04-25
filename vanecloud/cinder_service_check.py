@@ -64,72 +64,77 @@ def configure_callback(conf):
 
 
 def check():
-    keystone = get_keystone_client(CONFIGS['auth_ref'])
-    auth_token = keystone.auth_token
-
-    VOLUME_ENDPOINT = (
-        'http://{hostname}:8776/v1/{tenant}'.format(hostname=CONFIGS['ip'],
-                                                    tenant=keystone.tenant_id)
-    )
-
-    s = requests.Session()
-
-    s.headers.update(
-        {'Content-type': 'application/json',
-         'x-auth-token': auth_token})
-
     try:
-        # We cannot do /os-services?host=X as cinder returns a hostname of
-        # X@lvm for cinder-volume binary
-        r = s.get('%s/os-services' % VOLUME_ENDPOINT, verify=False, timeout=10)
-    except (exc.ConnectionError,
-            exc.HTTPError,
-            exc.Timeout) as e:
-        status_err(str(e))
+        keystone = get_keystone_client(CONFIGS['auth_ref'])
+        auth_token = keystone.auth_token
 
-    if not r.ok:
-        status_err('Could not get response from Cinder API')
+        VOLUME_ENDPOINT = (
+            'http://{hostname}:8776/v1/{tenant}'
+            .format(hostname=CONFIGS['ip'], tenant=keystone.tenant_id)
+        )
 
-    services = r.json()['services']
+        s = requests.Session()
 
-    # We need to match against a host of X and X@lvm (or whatever backend)
-    if CONFIGS['host']:
-        backend = ''.join((CONFIGS['host'], '@'))
-        services = [service for service in services
-                    if (service['host'].startswith(backend) or
-                        service['host'] == CONFIGS['host'])]
+        s.headers.update(
+            {'Content-type': 'application/json',
+             'x-auth-token': auth_token})
 
-    if len(services) == 0:
-        status_err('No host(s) found in the service list')
+        try:
+            # We cannot do /os-services?host=X as cinder returns a hostname of
+            # X@lvm for cinder-volume binary
+            r = s.get('%s/os-services' % VOLUME_ENDPOINT,
+                      verify=False, timeout=10)
+        except (exc.ConnectionError,
+                exc.HTTPError,
+                exc.Timeout) as e:
+            status_err(str(e))
 
-    status_ok()
+        if not r.ok:
+            status_err('Could not get response from Cinder API')
 
-    if CONFIGS['host']:
-        all_services_are_up = True
+        services = r.json()['services']
 
-        for service in services:
-            service_is_up = True
+        # We need to match against a host of X and X@lvm (or whatever backend)
+        if CONFIGS['host']:
+            backend = ''.join((CONFIGS['host'], '@'))
+            services = [service for service in services
+                        if (service['host'].startswith(backend) or
+                            service['host'] == CONFIGS['host'])]
 
-            if service['status'] == 'enabled' and service['state'] != 'up':
-                service_is_up = False
-                all_services_are_up = False
+        if len(services) == 0:
+            status_err('No host(s) found in the service list')
 
-            if '@' in service['host']:
-                [host, backend] = service['host'].split('@')
-                name = '%s-%s_status' % (service['binary'], backend)
+        status_ok()
+
+        if CONFIGS['host']:
+            all_services_are_up = True
+
+            for service in services:
+                service_is_up = True
+
+                if service['status'] == 'enabled' and service['state'] != 'up':
+                    service_is_up = False
+                    all_services_are_up = False
+
+                if '@' in service['host']:
+                    [host, backend] = service['host'].split('@')
+                    name = '%s-%s_status' % (service['binary'], backend)
+                    metric_bool(PLUGIN, name, service_is_up)
+
+            name = '%s_status' % service['binary']
+            metric_bool(PLUGIN, name, all_services_are_up)
+        else:
+            for service in services:
+                service_is_up = True
+                if service['status'] == 'enabled' and service['state'] != 'up':
+                    service_is_up = False
+
+                name = '%s_on_host_%s' % (service['binary'], service['host'])
                 metric_bool(PLUGIN, name, service_is_up)
-
-        name = '%s_status' % service['binary']
-        metric_bool(PLUGIN, name, all_services_are_up)
-    else:
-        for service in services:
-            service_is_up = True
-            if service['status'] == 'enabled' and service['state'] != 'up':
-                service_is_up = False
-
-            name = '%s_on_host_%s' % (service['binary'], service['host'])
-            metric_bool(PLUGIN, name, service_is_up)
-
+        metric_bool(PLUGIN, "{}_status".format(PLUGIN), True)
+    except:
+        metric_bool(PLUGIN, "{}_status".format(PLUGIN), False)
+        raise
 
 # register callbacks
 collectd.register_config(configure_callback)

@@ -52,39 +52,44 @@ def configure_callback(conf):
 
 
 def check():
-
-    NETWORK_ENDPOINT = 'http://{hostname}:9696'.format(hostname=CONFIGS['ip'])
     try:
-        neutron = get_neutron_client(endpoint_url=NETWORK_ENDPOINT)
+        NETWORK_ENDPOINT = 'http://{hostname}:9696'\
+                           .format(hostname=CONFIGS['ip'])
+        try:
+            neutron = get_neutron_client(endpoint_url=NETWORK_ENDPOINT)
 
-    # not gathering api status metric here so catch any exception
-    except Exception as e:
-        status_err(str(e))
+        # not gathering api status metric here so catch any exception
+        except Exception as e:
+            status_err(str(e))
 
-    # gather nova service states
-    if CONFIGS['host']:
-        agents = neutron.list_agents(host=CONFIGS['host'])['agents']
-    else:
-        agents = neutron.list_agents()['agents']
-
-    if len(agents) == 0:
-        status_err("No host(s) found in the agents list")
-
-    # return all the things
-    status_ok()
-    for agent in agents:
-        agent_is_up = True
-        if agent['admin_state_up'] and not agent['alive']:
-            agent_is_up = False
-
+        # gather nova service states
         if CONFIGS['host']:
-            name = '%s_status' % agent['binary']
+            agents = neutron.list_agents(host=CONFIGS['host'])['agents']
         else:
-            name = '%s_%s_on_host_%s' % (agent['binary'],
-                                         agent['id'],
-                                         agent['host'])
+            agents = neutron.list_agents()['agents']
 
-        metric_bool(PLUGIN, name, agent_is_up)
+        if len(agents) == 0:
+            status_err("No host(s) found in the agents list")
+
+        # return all the things
+        status_ok()
+        for agent in agents:
+            agent_is_up = True
+            if agent['admin_state_up'] and not agent['alive']:
+                agent_is_up = False
+
+            if CONFIGS['host']:
+                name = '%s_status' % agent['binary']
+            else:
+                name = '%s_%s_on_host_%s' % (agent['binary'],
+                                             agent['id'],
+                                             agent['host'])
+
+            metric_bool(PLUGIN, name, agent_is_up)
+        metric_bool(PLUGIN, "{}_status".format(PLUGIN), True)
+    except:
+        metric_bool(PLUGIN, "{}_status".format(PLUGIN), False)
+        raise
 
 
 # register callbacks

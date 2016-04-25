@@ -19,6 +19,7 @@ import subprocess
 
 
 from maas_common import metric
+from maas_common import metric_bool
 from maas_common import status_err
 from maas_common import status_ok
 
@@ -123,33 +124,38 @@ def print_metrics(replica_status):
 
 
 def main():
-    replica_status = {}
-    for output_type in ['status', 'variables']:
-        retcode, output, err = galera_check(
-            generate_query(CONFIGS['ip'], CONFIGS['port'],
-                           output_type=output_type)
-        )
+    try:
+        replica_status = {}
+        for output_type in ['status', 'variables']:
+            retcode, output, err = galera_check(
+                generate_query(CONFIGS['ip'], CONFIGS['port'],
+                               output_type=output_type)
+            )
 
-        if retcode > 0:
-            status_err(err)
+            if retcode > 0:
+                status_err(err)
 
-        if not output:
-            status_err('No output received from mysql. Cannot gather metrics.')
+            if not output:
+                status_err('No output received from mysql. \
+                           Cannot gather metrics.')
 
-        show_list = output.split('\n')[1:-1]
-        for i in show_list:
-            replica_status[i.split('\t')[0]] = i.split('\t')[1]
+            show_list = output.split('\n')[1:-1]
+            for i in show_list:
+                replica_status[i.split('\t')[0]] = i.split('\t')[1]
 
-    if replica_status['wsrep_cluster_status'] != "Primary":
-        status_err("there is a partition in the cluster")
+        if replica_status['wsrep_cluster_status'] != "Primary":
+            status_err("there is a partition in the cluster")
 
-    if (replica_status['wsrep_local_state_uuid'] !=
-            replica_status['wsrep_cluster_state_uuid']):
-        status_err("the local node is out of sync")
+        if (replica_status['wsrep_local_state_uuid'] !=
+                replica_status['wsrep_cluster_state_uuid']):
+            status_err("the local node is out of sync")
 
-    if (int(replica_status['wsrep_local_state']) == 4 and
-            replica_status['wsrep_local_state_comment'] == "Synced"):
-        print_metrics(replica_status)
+        if (int(replica_status['wsrep_local_state']) == 4 and
+                replica_status['wsrep_local_state_comment'] == "Synced"):
+            print_metrics(replica_status)
+    except:
+        metric_bool(PLUGIN, '{}_status'.format(PLUGIN), False)
+        raise
 
 
 # register callbacks

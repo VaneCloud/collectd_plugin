@@ -75,28 +75,31 @@ def item_stats(host, port):
 
 
 def main():
-
-    bind_ip = str(CONFIGS['ip'])
-    port = CONFIGS['port']
-    is_up = True
-
     try:
-        stats = item_stats(bind_ip, port)
-        current_version = stats['version']
-    except (TypeError, IndexError):
-        is_up = False
-    else:
+        bind_ip = str(CONFIGS['ip'])
+        port = CONFIGS['port']
         is_up = True
-        if current_version not in VERSIONS:
-            status_err('This plugin has only been tested with version %s '
-                       'of memcached, and you are using version %s'
-                       % (VERSIONS, current_version))
 
-    status_ok()
-    metric_bool(PLUGIN, 'memcache_api_local_status', is_up)
-    if is_up:
-        for m, u in MEMCACHE_METRICS.iteritems():
-            metric(PLUGIN, 'memcache_%s' % m, stats[m])
+        try:
+            stats = item_stats(bind_ip, port)
+            current_version = stats['version']
+        except (TypeError, IndexError):
+            is_up = False
+        else:
+            is_up = True
+            if current_version not in VERSIONS:
+                status_err('This plugin has only been tested with version %s '
+                           'of memcached, and you are using version %s'
+                           % (VERSIONS, current_version))
+
+        status_ok()
+        metric_bool(PLUGIN, 'memcache_api_local_status', is_up)
+        if is_up:
+            for m, u in MEMCACHE_METRICS.iteritems():
+                metric(PLUGIN, 'memcache_%s' % m, stats[m])
+    except:
+        metric_bool(PLUGIN, 'memcache_api_local_status', False)
+        raise
 
 
 # register callbacks

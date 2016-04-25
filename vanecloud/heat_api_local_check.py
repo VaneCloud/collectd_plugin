@@ -55,38 +55,42 @@ def configure_callback(conf):
 
 
 def check():
-    keystone = get_keystone_client(CONFIGS['auth_ref'])
-    tenant_id = keystone.tenant_id
-
-    HEAT_ENDPOINT = ('http://{ip}:8004/v1/{tenant}'.format
-                     (ip=CONFIGS['ip'], tenant=tenant_id))
-
     try:
-        if CONFIGS['ip']:
-            heat = get_heat_client(endpoint=HEAT_ENDPOINT)
+        keystone = get_keystone_client(CONFIGS['auth_ref'])
+        tenant_id = keystone.tenant_id
+
+        HEAT_ENDPOINT = ('http://{ip}:8004/v1/{tenant}'.format
+                         (ip=CONFIGS['ip'], tenant=tenant_id))
+
+        try:
+            if CONFIGS['ip']:
+                heat = get_heat_client(endpoint=HEAT_ENDPOINT)
+            else:
+                heat = get_heat_client()
+
+            is_up = True
+        except exc.HTTPException as e:
+            is_up = False
+        # Any other exception presumably isn't an API error
+        except Exception as e:
+            status_err(str(e))
         else:
-            heat = get_heat_client()
+            # time something arbitrary
+            start = time.time()
+            heat.build_info.build_info()
+            end = time.time()
+            milliseconds = (end - start) * 1000
 
-        is_up = True
-    except exc.HTTPException as e:
-        is_up = False
-    # Any other exception presumably isn't an API error
-    except Exception as e:
-        status_err(str(e))
-    else:
-        # time something arbitrary
-        start = time.time()
-        heat.build_info.build_info()
-        end = time.time()
-        milliseconds = (end - start) * 1000
-
-    status_ok()
-    metric_bool(PLUGIN, 'heat_api_local_status', is_up)
-    if is_up:
-        # only want to send other metrics if api is up
-        metric(PLUGIN,
-               'heat_api_local_response_time',
-               '%.3f' % milliseconds,)
+        status_ok()
+        metric_bool(PLUGIN, 'heat_api_local_status', is_up)
+        if is_up:
+            # only want to send other metrics if api is up
+            metric(PLUGIN,
+                   'heat_api_local_response_time',
+                   '%.3f' % milliseconds,)
+    except:
+        metric_bool(PLUGIN, 'heat_api_local_status', is_up)
+        raise
 
 # register callbacks
 collectd.register_config(configure_callback)
