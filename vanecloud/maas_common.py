@@ -428,6 +428,8 @@ def get_auth_from_file():
         if e.errno == errno.ENOENT:
             return None
         status_err(e)
+    except ValueError:  # No JSON object could be decoded
+        return None
 
 
 def get_auth_details(openrc_file=OPENRC):
