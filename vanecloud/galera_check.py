@@ -34,6 +34,8 @@ def configure_callback(conf):
     ip = None
     port = None
     interval = 10
+    graphite_host = None
+    graphite_port = None
 
     for node in conf.children:
         key = node.key
@@ -45,6 +47,10 @@ def configure_callback(conf):
             interval = val
         elif key == 'port':  # Only return metrics for specified host
             port == val
+        elif key == 'graphite_host':
+            graphite_host = val
+        elif key == 'graphite_port':
+            graphite_port = val
         else:
             collectd.warning('galera_check: Unknown config key: {}'
                              .format(key))
@@ -53,6 +59,8 @@ def configure_callback(conf):
     CONFIGS['ip'] = ip
     CONFIGS['port'] = port
     CONFIGS['interval'] = interval
+    CONFIGS['graphite_host'] = graphite_host
+    CONFIGS['graphite_port'] = graphite_port
 
 
 def galera_check(arg):
@@ -98,15 +106,25 @@ def parse_args():
 def print_metrics(replica_status):
     status_ok()
     metric(PLUGIN, 'wsrep_replicated_bytes',
-           replica_status['wsrep_replicated_bytes'])
+           replica_status['wsrep_replicated_bytes'],
+           graphite_host=CONFIGS['graphite_host'],
+           graphite_port=CONFIGS['graphite_port'])
     metric(PLUGIN, 'wsrep_received_bytes',
-           replica_status['wsrep_received_bytes'])
+           replica_status['wsrep_received_bytes'],
+           graphite_host=CONFIGS['graphite_host'],
+           graphite_port=CONFIGS['graphite_port'])
     metric(PLUGIN, 'wsrep_commit_window_size',
-           replica_status['wsrep_commit_window'])
+           replica_status['wsrep_commit_window'],
+           graphite_host=CONFIGS['graphite_host'],
+           graphite_port=CONFIGS['graphite_port'])
     metric(PLUGIN, 'wsrep_cluster_size',
-           replica_status['wsrep_cluster_size'])
+           replica_status['wsrep_cluster_size'],
+           graphite_host=CONFIGS['graphite_host'],
+           graphite_port=CONFIGS['graphite_port'])
     metric(PLUGIN, 'queries_per_second',
-           replica_status['Queries'])
+           replica_status['Queries'],
+           graphite_host=CONFIGS['graphite_host'],
+           graphite_port=CONFIGS['graphite_port'])
     # metric('wsrep_cluster_state_uuid', 'string',
     #        replica_status['wsrep_cluster_state_uuid'])
     # metric('wsrep_cluster_status', 'string',
@@ -116,11 +134,17 @@ def print_metrics(replica_status):
     # metric('wsrep_local_state_comment', 'string',
     #        replica_status['wsrep_local_state_comment'])
     metric(PLUGIN, 'mysql_max_configured_connections',
-           replica_status['max_connections'])
+           replica_status['max_connections'],
+           graphite_host=CONFIGS['graphite_host'],
+           graphite_port=CONFIGS['graphite_port'])
     metric(PLUGIN, 'mysql_current_connections',
-           replica_status['Threads_connected'])
+           replica_status['Threads_connected'],
+           graphite_host=CONFIGS['graphite_host'],
+           graphite_port=CONFIGS['graphite_port'])
     metric(PLUGIN, 'mysql_max_seen_connections',
-           replica_status['Max_used_connections'])
+           replica_status['Max_used_connections'],
+           graphite_host=CONFIGS['graphite_host'],
+           graphite_port=CONFIGS['graphite_port'])
 
 
 def main():
@@ -153,9 +177,13 @@ def main():
         if (int(replica_status['wsrep_local_state']) == 4 and
                 replica_status['wsrep_local_state_comment'] == "Synced"):
             print_metrics(replica_status)
-        metric_bool(PLUGIN, '{}_status'.format(PLUGIN), True)
+        metric_bool(PLUGIN, '{}_status'.format(PLUGIN), True,
+                    graphite_host=CONFIGS['graphite_host'],
+                    graphite_port=CONFIGS['graphite_port'])
     except:
-        metric_bool(PLUGIN, '{}_status'.format(PLUGIN), False)
+        metric_bool(PLUGIN, '{}_status'.format(PLUGIN), False,
+                    graphite_host=CONFIGS['graphite_host'],
+                    graphite_port=CONFIGS['graphite_port'])
         raise
 
 

@@ -40,6 +40,8 @@ def configure_callback(conf):
     ip = None
     host = None
     interval = 10
+    graphite_host = None
+    graphite_port = None
 
     for node in conf.children:
         key = node.key
@@ -51,6 +53,10 @@ def configure_callback(conf):
             interval = val
         elif key == 'host':  # Only return metrics for specified host
             host == host
+        elif key == 'graphite_host':
+            graphite_host = val
+        elif key == 'graphite_port':
+            graphite_port = val
         else:
             collectd.warning('cinder_service_check: Unknown config key: {}'
                              .format(key))
@@ -61,6 +67,8 @@ def configure_callback(conf):
     CONFIGS['host'] = host
     CONFIGS['auth_ref'] = auth_ref
     CONFIGS['interval'] = interval
+    CONFIGS['graphite_host'] = graphite_host
+    CONFIGS['graphite_port'] = graphite_port
 
 
 def check():
@@ -118,22 +126,32 @@ def check():
 
                 if '@' in service['host']:
                     [host, backend] = service['host'].split('@')
-                    name = '%s-%s_status' % (service['binary'], backend)
-                    metric_bool(PLUGIN, name, service_is_up)
+                    name = '%s.%s_status' % (service['binary'], backend)
+                    metric_bool(PLUGIN, name, service_is_up,
+                                graphite_host=CONFIGS['graphite_host'],
+                                graphite_port=CONFIGS['graphite_port'])
 
             name = '%s_status' % service['binary']
-            metric_bool(PLUGIN, name, all_services_are_up)
+            metric_bool(PLUGIN, name, all_services_are_up,
+                        graphite_host=CONFIGS['graphite_host'],
+                        graphite_port=CONFIGS['graphite_port'])
         else:
             for service in services:
                 service_is_up = True
                 if service['status'] == 'enabled' and service['state'] != 'up':
                     service_is_up = False
 
-                name = '%s_on_host_%s' % (service['binary'], service['host'])
-                metric_bool(PLUGIN, name, service_is_up)
-        metric_bool(PLUGIN, "{}_status".format(PLUGIN), True)
+                name = '%s.%s' % (service['binary'], service['host'])
+                metric_bool(PLUGIN, name, service_is_up,
+                            graphite_host=CONFIGS['graphite_host'],
+                            graphite_port=CONFIGS['graphite_port'])
+        metric_bool(PLUGIN, "{}_status".format(PLUGIN), True,
+                    graphite_host=CONFIGS['graphite_host'],
+                    graphite_port=CONFIGS['graphite_port'])
     except:
-        metric_bool(PLUGIN, "{}_status".format(PLUGIN), False)
+        metric_bool(PLUGIN, "{}_status".format(PLUGIN), False,
+                    graphite_host=CONFIGS['graphite_host'],
+                    graphite_port=CONFIGS['graphite_port'])
         raise
 
 # register callbacks

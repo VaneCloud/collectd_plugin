@@ -31,6 +31,8 @@ def configure_callback(conf):
     ip = None
     host = None
     interval = 10
+    graphite_host = None
+    graphite_port = None
 
     for node in conf.children:
         key = node.key
@@ -42,6 +44,10 @@ def configure_callback(conf):
             interval = val
         elif key == 'host':  # Only return metrics for specified host
             host == host
+        elif key == 'graphite_host':
+            graphite_host = val
+        elif key == 'graphite_port':
+            graphite_port = val
         else:
             collectd.warning('nova_service_check: Unknown config key: {}'
                              .format(key))
@@ -52,6 +58,8 @@ def configure_callback(conf):
     CONFIGS['host'] = host
     CONFIGS['auth_ref'] = auth_ref
     CONFIGS['interval'] = interval
+    CONFIGS['graphite_host'] = graphite_host
+    CONFIGS['graphite_port'] = graphite_port
 
 
 def check():
@@ -92,12 +100,18 @@ def check():
             if CONFIGS['host']:
                 name = '%s_status' % service.binary
             else:
-                name = '%s_on_host_%s_status' % (service.binary, service.host)
+                name = '%s.%s_status' % (service.binary, service.host)
 
-            metric_bool(PLUGIN, name, service_is_up)
-        metric_bool(PLUGIN, 'nova_service_check_status', True)
+            metric_bool(PLUGIN, name, service_is_up,
+                        graphite_host=CONFIGS['graphite_host'],
+                        graphite_port=CONFIGS['graphite_port'])
+        metric_bool(PLUGIN, 'nova_service_check_status', True,
+                    graphite_host=CONFIGS['graphite_host'],
+                    graphite_port=CONFIGS['graphite_port'])
     except:
-        metric_bool(PLUGIN, 'nova_service_check_status', False)
+        metric_bool(PLUGIN, 'nova_service_check_status', False,
+                    graphite_host=CONFIGS['graphite_host'],
+                    graphite_port=CONFIGS['graphite_port'])
         raise
 
 

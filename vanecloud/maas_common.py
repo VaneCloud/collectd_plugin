@@ -16,6 +16,7 @@
 from __future__ import print_function
 
 import datetime
+import time
 import errno
 import json
 import logging
@@ -23,6 +24,7 @@ import os
 import re
 import sys
 import collectd
+import socket
 
 AUTH_DETAILS = {'OS_USERNAME': None,
                 'OS_PASSWORD': None,
@@ -527,25 +529,48 @@ def status_ok(message=None, force_print=False):
     status('okay', message, force_print=force_print)
 
 
-def metric(plugin_name, name, value, interval=10):
-    dispatch_value(plugin_name, name, value, interval=interval)
+def metric(plugin_name, name, value, interval=10, graphite_host=None,
+           graphite_port=None):
+    dispatch_value(plugin_name, name, value, interval=interval,
+                   graphite_host=graphite_host, graphite_port=graphite_port)
 
 
-def metric_bool(plugin_name, name, success, interval=10):
+def metric_bool(plugin_name, name, success, interval=10, graphite_host=None,
+                graphite_port=None):
     value = success and 1 or 0
-    metric(plugin_name, name, value, interval=interval)
+    metric(plugin_name, name, value, interval=interval,
+           graphite_host=graphite_host, graphite_port=graphite_port)
 
 
 def dispatch_value(plugin_name, key, value, plugin_instance=None,
-                   type_instance=None, type='gauge', interval=10):
+                   type_instance=None, type='gauge', interval=10,
+                   direct_to_graphite=True, graphite_host=None,
+                   graphite_port=None, prefix='vanecloud'):
 
-    val = collectd.Values(plugin=plugin_name)
-    val.type = type
-    val.plugin_instance = plugin_instance or ''
-    val.type_instance = key
-    val.values = [value]
-    val.interval = interval
-    val.dispatch()
+    if direct_to_graphite:
+        if prefix:
+            metric = '{}.{}.{} {} {}'.format(prefix, plugin_name, key,
+                                             value, time.time())
+        else:
+            metric = '{}.{} {} {}'.format(plugin_name, key, value, time.time())
+        send_metric_direct_to_graphite(graphite_host, graphite_port, metric)
+    else:
+        val = collectd.Values(plugin=plugin_name)
+        val.type = type
+        val.plugin_instance = plugin_instance or ''
+        val.type_instance = key
+        val.values = [value]
+        val.interval = interval
+        val.dispatch()
+
+
+def send_metric_direct_to_graphite(graphite_host, graphite_port, metric):
+    graphiteSock = socket.socket(socket.AF_INET,
+                                 socket.SOCK_DGRAM)
+
+    graphiteSock.connect((graphite_host, int(graphite_port)))
+    graphiteSock.sendall(metric)
+    graphiteSock.close()
 
 try:
     logging.basicConfig(filename='/var/log/maas_plugins.log',

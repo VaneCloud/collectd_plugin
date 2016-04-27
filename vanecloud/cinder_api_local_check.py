@@ -41,6 +41,8 @@ def configure_callback(conf):
     """Receive configuration block"""
     ip = None
     interval = 10
+    graphite_host = None
+    graphite_port = None
 
     for node in conf.children:
         key = node.key
@@ -50,6 +52,10 @@ def configure_callback(conf):
             ip = val
         elif key == 'interval':
             interval = val
+        elif key == 'graphite_host':
+            graphite_host = val
+        elif key == 'graphite_port':
+            graphite_port = val
         else:
             collectd.warning('cinder_api_local_check: Unknown config key: {}'
                              .format(key))
@@ -59,6 +65,8 @@ def configure_callback(conf):
     CONFIGS['ip'] = ip
     CONFIGS['auth_ref'] = auth_ref
     CONFIGS['interval'] = interval
+    CONFIGS['graphite_host'] = graphite_host
+    CONFIGS['graphite_port'] = graphite_port
 
 
 def check():
@@ -101,24 +109,38 @@ def check():
             total_snaps = len(snap.json()['snapshots'])
 
         status_ok()
-        metric_bool(PLUGIN, 'cinder_api_local_status', is_up)
+        metric_bool(PLUGIN, 'cinder_api_local_status', is_up,
+                    graphite_host=CONFIGS['graphite_host'],
+                    graphite_port=CONFIGS['graphite_port'])
         # only want to send other metrics if api is up
         if is_up:
             metric(PLUGIN,
                    'cinder_api_local_response_time',
-                   '%.3f' % milliseconds,)
-            metric(PLUGIN, 'total_cinder_volumes', total_vols)
+                   '%.3f' % milliseconds,
+                   graphite_host=CONFIGS['graphite_host'],
+                   graphite_port=CONFIGS['graphite_port'])
+            metric(PLUGIN, 'total_cinder_volumes', total_vols,
+                   graphite_host=CONFIGS['graphite_host'],
+                   graphite_port=CONFIGS['graphite_port'])
             for status in VOLUME_STATUSES:
                 metric(PLUGIN,
                        'cinder_%s_volumes' % status,
-                       vol_status_count[status])
-            metric(PLUGIN, 'total_cinder_snapshots', total_snaps)
+                       vol_status_count[status],
+                       graphite_host=CONFIGS['graphite_host'],
+                       graphite_port=CONFIGS['graphite_port'])
+            metric(PLUGIN, 'total_cinder_snapshots', total_snaps,
+                   graphite_host=CONFIGS['graphite_host'],
+                   graphite_port=CONFIGS['graphite_port'])
             for status in VOLUME_STATUSES:
                 metric(PLUGIN,
                        'cinder_%s_snaps' % status,
-                       snap_status_count[status])
+                       snap_status_count[status],
+                       graphite_host=CONFIGS['graphite_host'],
+                       graphite_port=CONFIGS['graphite_port'])
     except:
-        metric_bool(PLUGIN, 'cinder_api_local_status', False)
+        metric_bool(PLUGIN, 'cinder_api_local_status', False,
+                    graphite_host=CONFIGS['graphite_host'],
+                    graphite_port=CONFIGS['graphite_port'])
         raise
 
 # register callbacks

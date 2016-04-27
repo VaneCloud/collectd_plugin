@@ -40,6 +40,8 @@ def configure_callback(conf):
     ip = None
     port = 11211
     interval = 10
+    graphite_host = None
+    graphite_port = None
 
     for node in conf.children:
         key = node.key
@@ -51,6 +53,10 @@ def configure_callback(conf):
             interval = val
         elif key == 'port':  # memcached port.
             port == port
+        elif key == 'graphite_host':
+            graphite_host = val
+        elif key == 'graphite_port':
+            graphite_port = val
         else:
             collectd.warning('memcached_status: Unknown config key: {}'
                              .format(key))
@@ -59,6 +65,8 @@ def configure_callback(conf):
     CONFIGS['ip'] = ip
     CONFIGS['port'] = port
     CONFIGS['interval'] = interval
+    CONFIGS['graphite_host'] = graphite_host
+    CONFIGS['graphite_port'] = graphite_port
 
 
 def item_stats(host, port):
@@ -93,12 +101,18 @@ def main():
                            % (VERSIONS, current_version))
 
         status_ok()
-        metric_bool(PLUGIN, 'memcache_api_local_status', is_up)
+        metric_bool(PLUGIN, 'memcache_api_local_status', is_up,
+                    graphite_host=CONFIGS['graphite_host'],
+                    graphite_port=CONFIGS['graphite_port'])
         if is_up:
             for m, u in MEMCACHE_METRICS.iteritems():
-                metric(PLUGIN, 'memcache_%s' % m, stats[m])
+                metric(PLUGIN, 'memcache_%s' % m, stats[m],
+                       graphite_host=CONFIGS['graphite_host'],
+                       graphite_port=CONFIGS['graphite_port'])
     except:
-        metric_bool(PLUGIN, 'memcache_api_local_status', False)
+        metric_bool(PLUGIN, 'memcache_api_local_status', False,
+                    graphite_host=CONFIGS['graphite_host'],
+                    graphite_port=CONFIGS['graphite_port'])
         raise
 
 

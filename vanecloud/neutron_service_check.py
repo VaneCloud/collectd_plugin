@@ -30,6 +30,8 @@ def configure_callback(conf):
     ip = None
     host = None
     interval = 10
+    graphite_host = None
+    graphite_port = None
 
     for node in conf.children:
         key = node.key
@@ -41,6 +43,10 @@ def configure_callback(conf):
             interval = val
         elif key == 'host':  # Only return metrics for specified host
             host == host
+        elif key == 'graphite_host':
+            graphite_host = val
+        elif key == 'graphite_port':
+            graphite_port = val
         else:
             collectd.warning('neutron_service_check: Unknown config key: {}'
                              .format(key))
@@ -49,6 +55,8 @@ def configure_callback(conf):
     CONFIGS['ip'] = ip
     CONFIGS['host'] = host
     CONFIGS['interval'] = interval
+    CONFIGS['graphite_host'] = graphite_host
+    CONFIGS['graphite_port'] = graphite_port
 
 
 def check():
@@ -81,14 +89,20 @@ def check():
             if CONFIGS['host']:
                 name = '%s_status' % agent['binary']
             else:
-                name = '%s_%s_on_host_%s' % (agent['binary'],
-                                             agent['id'],
-                                             agent['host'])
+                name = '%s.%s_%s' % (agent['binary'],
+                                     agent['host'],
+                                     agent['id'])
 
-            metric_bool(PLUGIN, name, agent_is_up)
-        metric_bool(PLUGIN, "{}_status".format(PLUGIN), True)
+            metric_bool(PLUGIN, name, agent_is_up,
+                        graphite_host=CONFIGS['graphite_host'],
+                        graphite_port=CONFIGS['graphite_port'])
+        metric_bool(PLUGIN, "{}_status".format(PLUGIN), True,
+                    graphite_host=CONFIGS['graphite_host'],
+                    graphite_port=CONFIGS['graphite_port'])
     except:
-        metric_bool(PLUGIN, "{}_status".format(PLUGIN), False)
+        metric_bool(PLUGIN, "{}_status".format(PLUGIN), False,
+                    graphite_host=CONFIGS['graphite_host'],
+                    graphite_port=CONFIGS['graphite_port'])
         raise
 
 

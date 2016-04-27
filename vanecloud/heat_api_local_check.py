@@ -34,6 +34,8 @@ def configure_callback(conf):
     """Receive configuration block"""
     ip = None
     interval = 10
+    graphite_host = None
+    graphite_port = None
 
     for node in conf.children:
         key = node.key
@@ -43,6 +45,10 @@ def configure_callback(conf):
             ip = val
         elif key == 'interval':
             interval = val
+        elif key == 'graphite_host':
+            graphite_host = val
+        elif key == 'graphite_port':
+            graphite_port = val
         else:
             collectd.warning('heat_api_local_check: Unknown config key: {}'
                              .format(key))
@@ -52,6 +58,8 @@ def configure_callback(conf):
     CONFIGS['ip'] = ip
     CONFIGS['auth_ref'] = auth_ref
     CONFIGS['interval'] = interval
+    CONFIGS['graphite_host'] = graphite_host
+    CONFIGS['graphite_port'] = graphite_port
 
 
 def check():
@@ -82,14 +90,20 @@ def check():
             milliseconds = (end - start) * 1000
 
         status_ok()
-        metric_bool(PLUGIN, 'heat_api_local_status', is_up)
+        metric_bool(PLUGIN, 'heat_api_local_status', is_up,
+                    graphite_host=CONFIGS['graphite_host'],
+                    graphite_port=CONFIGS['graphite_port'])
         if is_up:
             # only want to send other metrics if api is up
             metric(PLUGIN,
                    'heat_api_local_response_time',
-                   '%.3f' % milliseconds,)
+                   '%.3f' % milliseconds,
+                   graphite_host=CONFIGS['graphite_host'],
+                   graphite_port=CONFIGS['graphite_port'])
     except:
-        metric_bool(PLUGIN, 'heat_api_local_status', is_up)
+        metric_bool(PLUGIN, 'heat_api_local_status', is_up,
+                    graphite_host=CONFIGS['graphite_host'],
+                    graphite_port=CONFIGS['graphite_port'])
         raise
 
 # register callbacks

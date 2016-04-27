@@ -67,6 +67,8 @@ def configure_callback(conf):
     """Receive configuration block"""
     ip = None
     interval = 10
+    graphite_host = None
+    graphite_port = None
 
     for node in conf.children:
         key = node.key
@@ -76,6 +78,10 @@ def configure_callback(conf):
             ip = val
         elif key == 'interval':
             interval = val
+        elif key == 'graphite_host':
+            graphite_host = val
+        elif key == 'graphite_port':
+            graphite_port = val
         else:
             collectd.warning('nova_cloud_stats: Unknown config key: {}'
                              .format(key))
@@ -85,6 +91,8 @@ def configure_callback(conf):
     CONFIGS['ip'] = ip
     CONFIGS['auth_ref'] = auth_ref
     CONFIGS['interval'] = interval
+    CONFIGS['graphite_host'] = graphite_host
+    CONFIGS['graphite_port'] = graphite_port
 
 
 def check():
@@ -122,12 +130,18 @@ def check():
             metric(PLUGIN,
                    'cloud_resource_%s' % metric_name,
                    cloud_stats[metric_name]['value'],
-                   interval=CONFIGS['interval'])
+                   interval=CONFIGS['interval'],
+                   graphite_host=CONFIGS['graphite_host'],
+                   graphite_port=CONFIGS['graphite_port'])
         metric_bool(PLUGIN, 'nova_cloud_stats', True,
-                    interval=CONFIGS['interval'])
+                    interval=CONFIGS['interval'],
+                    graphite_host=CONFIGS['graphite_host'],
+                    graphite_port=CONFIGS['graphite_port'])
     except:
         metric_bool(PLUGIN, 'nova_cloud_stats', False,
-                    interval=CONFIGS['interval'])
+                    interval=CONFIGS['interval'],
+                    graphite_host=CONFIGS['graphite_host'],
+                    graphite_port=CONFIGS['graphite_port'])
         raise
 
 
