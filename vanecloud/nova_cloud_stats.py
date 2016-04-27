@@ -123,6 +123,8 @@ def check():
                    'cloud_resource_%s' % metric_name,
                    cloud_stats[metric_name]['value'],
                    interval=CONFIGS['interval'])
+        metric_bool(PLUGIN, 'nova_cloud_stats', True,
+                    interval=CONFIGS['interval'])
     except:
         metric_bool(PLUGIN, 'nova_cloud_stats', False,
                     interval=CONFIGS['interval'])
@@ -131,4 +133,4 @@ def check():
 
 # register callbacks
 collectd.register_config(configure_callback)
-collectd.register_read(check, interval=2)
+collectd.register_read(check)

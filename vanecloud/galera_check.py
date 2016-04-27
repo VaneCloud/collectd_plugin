@@ -153,6 +153,7 @@ def main():
         if (int(replica_status['wsrep_local_state']) == 4 and
                 replica_status['wsrep_local_state_comment'] == "Synced"):
             print_metrics(replica_status)
+        metric_bool(PLUGIN, '{}_status'.format(PLUGIN), True)
     except:
         metric_bool(PLUGIN, '{}_status'.format(PLUGIN), False)
         raise
@@ -160,4 +161,4 @@ def main():
 
 # register callbacks
 collectd.register_config(configure_callback)
-collectd.register_read(main, interval=2)
+collectd.register_read(main)

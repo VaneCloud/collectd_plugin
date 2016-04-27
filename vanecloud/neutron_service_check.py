@@ -94,4 +94,4 @@ def check():
 
 # register callbacks
 collectd.register_config(configure_callback)
-collectd.register_read(check, interval=2)
+collectd.register_read(check)

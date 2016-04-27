@@ -104,4 +104,4 @@ def main():
 
 # register callbacks
 collectd.register_config(configure_callback)
-collectd.register_read(main, interval=2)
+collectd.register_read(main)
