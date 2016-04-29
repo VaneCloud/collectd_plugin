@@ -342,7 +342,6 @@ class GPFS(object):
                                 stdout=subprocess.PIPE)
 
     def read_callback(self):
-        self.log_verbose('Read callback called')
         self.dump_ds()
         for key in self.metrics:
             metric(PLUGIN,
