@@ -142,7 +142,7 @@ def check():
                     service_is_up = False
 
                 name = '%s.%s' % (service['binary'], service['host'])
-                metric_bool(PLUGIN, name, service_is_up,
+                metric_bool(PLUGIN, name.replace('@', '_'), service_is_up,
                             graphite_host=CONFIGS['graphite_host'],
                             graphite_port=CONFIGS['graphite_port'])
         metric_bool(PLUGIN, "{}_status".format(PLUGIN), True,
