@@ -59,6 +59,7 @@ class GPFS(object):
         """
         fd = self._run(cmd='/usr/lpp/mmfs/bin/mmgetstate -aLY')
         fdd = self._get_childs_data(fd)
+        error_node_num = 0
         if fdd:
             for line in fdd.splitlines()[1:]:
                 """
@@ -82,15 +83,19 @@ class GPFS(object):
                 # Explain node state
                 if line.split(':')[8] == 'down':
                     node_status = 0
+                    error_node_num += 1
                 elif line.split(':')[8] == 'active':
                     node_status = 1
                 elif line.split(':')[8] == 'arbitraiting':
                     node_status = 2
+                    error_node_num += 1
                 else:
                     node_status = 3
+                    error_node_num += 1
                 self.metrics['node.' + node_name + '_status'] = node_status
         else:
             pass
+        self.metrics['node.error_node_num'] = error_node_num
         return
 
     def _get_gpfs_disk_status(self):
