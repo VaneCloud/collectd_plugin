@@ -15,9 +15,11 @@
 # limitations under the License.
 
 from maas_common import get_neutron_client
+from maas_common import metric
 from maas_common import metric_bool
 from maas_common import status_err
 from maas_common import status_ok
+from collections import defaultdict as dict
 
 import collectd
 
@@ -61,6 +63,7 @@ def configure_callback(conf):
 
 def check():
     try:
+        error_num = dict(int)
         NETWORK_ENDPOINT = 'http://{hostname}:9696'\
                            .format(hostname=CONFIGS['ip'])
         try:
@@ -92,10 +95,17 @@ def check():
                 name = '%s.%s_%s' % (agent['binary'],
                                      agent['host'],
                                      agent['id'])
-
+                if agent['binary'] not in error_num:
+                    error_num[agent['binary']] = 0
+                if not agent_is_up:
+                    error_num[agent['binary']] += 1
             metric_bool(PLUGIN, name, agent_is_up,
                         graphite_host=CONFIGS['graphite_host'],
                         graphite_port=CONFIGS['graphite_port'])
+        for k, v in error_num.items():
+            metric(PLUGIN, "{}_error_num".format(k), v,
+                   graphite_host=CONFIGS['graphite_host'],
+                   graphite_port=CONFIGS['graphite_port'])
         metric_bool(PLUGIN, "{}_status".format(PLUGIN), True,
                     graphite_host=CONFIGS['graphite_host'],
                     graphite_port=CONFIGS['graphite_port'])
