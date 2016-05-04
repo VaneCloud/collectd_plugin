@@ -95,7 +95,7 @@ class GPFS(object):
                 self.metrics['node.' + node_name + '_status'] = node_status
         else:
             pass
-        self.metrics['node.error_node_num'] = error_node_num
+        self.metrics['error_node_num'] = error_node_num
         return
 
     def _get_gpfs_disk_status(self):

@@ -17,10 +17,12 @@
 from maas_common import get_auth_ref
 from maas_common import get_keystone_client
 from maas_common import get_nova_client
+from maas_common import metric
 from maas_common import metric_bool
 from maas_common import status_err
 from maas_common import status_ok
 import collectd
+from collections import defaultdict as dict
 
 CONFIGS = {}
 PLUGIN = 'nova_service_check'
@@ -63,6 +65,7 @@ def configure_callback(conf):
 
 
 def check():
+    error_num = dict(int)
     try:
         keystone = get_keystone_client(CONFIGS['auth_ref'])
         auth_token = keystone.auth_token
@@ -105,6 +108,17 @@ def check():
             metric_bool(PLUGIN, name, service_is_up,
                         graphite_host=CONFIGS['graphite_host'],
                         graphite_port=CONFIGS['graphite_port'])
+            if service.binary not in error_num:
+                error_num[service.binary] = 0
+            if not service_is_up:
+                error_num[service.binary] += 1
+        for k, v in error_num.items():
+            metric(PLUGIN,
+                   '%s_error_num' % k,
+                   v,
+                   interval=CONFIGS['interval'],
+                   graphite_host=CONFIGS['graphite_host'],
+                   graphite_port=CONFIGS['graphite_port'])
         metric_bool(PLUGIN, 'nova_service_check_status', True,
                     graphite_host=CONFIGS['graphite_host'],
                     graphite_port=CONFIGS['graphite_port'])
