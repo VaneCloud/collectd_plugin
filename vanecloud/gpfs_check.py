@@ -176,7 +176,7 @@ class GPFS(object):
                     disk_status = 2
                 else:
                     disk_status = 3
-            self.metrics['disk.' + disk_name + '_status'] = disk_status
+            	self.metrics['disk.' + disk_name + '_status'] = disk_status
         return
 
     def _get_gpfs_filesystem_status(self):
